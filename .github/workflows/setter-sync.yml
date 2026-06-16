@@ -1,0 +1,35 @@
+name: Setter Scorecard Sync
+
+# Refreshes the setter scorecard cache hourly and commits it, so the Streamlit
+# Cloud app reads fresh numbers with no local machine. Secrets live in this repo.
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: pip install requests tzdata
+      - name: Sync cache
+        env:
+          CALENDLY_API_TOKEN: ${{ secrets.CALENDLY_API_TOKEN }}
+          GHL_PIT_TOKEN:      ${{ secrets.GHL_PIT_TOKEN }}
+          GHL_LOCATION_ID:    ${{ secrets.GHL_LOCATION_ID }}
+        run: python streamlit_setter_dashboard.py sync
+      - name: Commit refreshed cache
+        run: |
+          git config user.name "setter-sync-bot"
+          git config user.email "setter-sync-bot@users.noreply.github.com"
+          git add setter_cache.json
+          git diff --staged --quiet || (git commit -m "setter cache sync [skip ci]" && git push)
